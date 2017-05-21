@@ -27,9 +27,6 @@
 
 #define KOMM_PERROR -1
 #define KOMM_PECHO -10
-#define komm_checkprotocol(pver) (((pver)==0)||((pver)==2)) //Supports KOMM V2
-#define komm_checklen(ptr,size) (*((char*)(ptr)+2) == ((size) - 4))
-#define komm_checkcrc(ptr,size) 1 //dummy
 
 #define KOMM_IO_NONE 0x00
 #define KOMM_IO_AIN_S 0x01
@@ -44,6 +41,15 @@
 #define KOMM_IO_RLY_10A_NO 0x0A
 #define KOMM_IO_RLY_16A_NO 0x0B
 #define KOMM_IO_RLY_20A_NO 0x0C
+
+#define komm_checkprotocol(pver) (((pver)==0)||((pver)==2)) //Supports KOMM V2
+#define komm_checklen(ptr,size) (*((char*)(ptr)+2) == ((size) - 4))
+#define komm_checkcrc(ptr,size) 1 //dummy
+
+//pin starts at 0, based on io_status array order.
+#define is_pin_analog(pin) (io_status[pin]>KOMM_IO_NONE && io_status[pin]<=KOMM_IO_AIN_NS)
+#define is_pin_din(pin) (io_status[pin] == KOMM_IO_DIN)
+#define is_pin_dout(pin) (io_status[pin]>=KOMM_IO_OC && io_status[pin]<=KOMM_IO_RLY_20A_NO)
 
 //CRC8 generation
 char crc8_gen(const char *ptr, char size){
@@ -60,7 +66,7 @@ int komm_get_device_config(char *reply){
   *(reply+6) = 0x00;
   *(reply+7) = 0x00;
   *(reply+8) = 0x00;
-  *(reply+9) = 0x03;
+  *(reply+9) = 0x03; //sensus ID
   *(reply+10) = crc8_gen(reply,10);
   return 11;
 }
@@ -127,6 +133,7 @@ int komm_set_io_config(char *reply,const char *config,char size){
       io_status[i] = nmode;
     }
   }
+  //reconstructs reply as a copy of request.(does NOT show actual modified succesful values)
   reply[0]=0x02;
   reply[1]=0x04;
   reply[2]=size;
@@ -154,20 +161,58 @@ int komm_set_dout_s(char *reply, char addr,char value){
   reply[1] = 0x0C;
   reply[2] = 0x02;
   reply[3] = addr;
-  if(addr-1 < KOMM_IONUM && io_status[addr-1]>=KOMM_IO_OC && io_status[addr-1]<=KOMM_IO_RLY_20A_NO)
+  reply[4] = 0;
+  if(addr-1 < KOMM_IONUM && is_pin_dout(addr-1))
+  {
     platform_gpio_write(KOMM_IOMAP_MASK & io_map[addr-1], value);
-  reply[4] = (char) platform_gpio_read(KOMM_IOMAP_MASK & io_map[addr-1]);
+    reply[4] = (char) platform_gpio_read(KOMM_IOMAP_MASK & io_map[addr-1]);
+  }
   reply[5] = crc8_gen(reply,5);
   return 6;
 }
 //Get Digital Output Values
-int komm_get_dout(char *reply){return KOMM_PECHO;}
+int komm_get_dout(char *reply){
+  reply[0] = 0x02;
+  reply[1] = 0x0D;
+  reply[2] = 0x02;
+  reply[3] = ((is_pin_dout(0) && platform_gpio_read(KOMM_IOMAP_MASK & io_map[0]))<< 7) |
+             ((is_pin_dout(1) && platform_gpio_read(KOMM_IOMAP_MASK & io_map[1]))<< 6) |
+             ((is_pin_dout(2) && platform_gpio_read(KOMM_IOMAP_MASK & io_map[2]))<< 5) |
+             ((is_pin_dout(3) && platform_gpio_read(KOMM_IOMAP_MASK & io_map[3]))<< 4) |
+             ((is_pin_dout(4) && platform_gpio_read(KOMM_IOMAP_MASK & io_map[4]))<< 3) |
+             ((is_pin_dout(5) && platform_gpio_read(KOMM_IOMAP_MASK & io_map[5]))<< 2) |
+             ((is_pin_dout(6) && platform_gpio_read(KOMM_IOMAP_MASK & io_map[6]))<< 1) |
+             (is_pin_dout(7) && platform_gpio_read(KOMM_IOMAP_MASK & io_map[7]));
+  reply[4] = 0x00;
+  reply[4] |= ((is_pin_dout(8) && platform_gpio_read(KOMM_IOMAP_MASK & io_map[8]))<< 7) |
+              ((is_pin_dout(9) && platform_gpio_read(KOMM_IOMAP_MASK & io_map[9]))<< 6);
+  reply[5] = crc8_gen(reply,5);
+  return 6;
+}
+
 //Get Outputs Clousures
 int komm_get_clousure(char *reply){return KOMM_PECHO;}
 //Get Output Clousures
 int komm_get_clousure_s(char *reply, char addr){return KOMM_PECHO;}
 //Get Digital Inputs
-int komm_get_din(char *reply){return KOMM_PECHO;}
+int komm_get_din(char *reply){
+  reply[0] = 0x02;
+  reply[1] = 0x10;
+  reply[2] = 0x02;
+  reply[3] = ((is_pin_din(0) && platform_gpio_read(KOMM_IOMAP_MASK & io_map[0]))<< 7) |
+             ((is_pin_din(1) && platform_gpio_read(KOMM_IOMAP_MASK & io_map[1]))<< 6) |
+             ((is_pin_din(2) && platform_gpio_read(KOMM_IOMAP_MASK & io_map[2]))<< 5) |
+             ((is_pin_din(3) && platform_gpio_read(KOMM_IOMAP_MASK & io_map[3]))<< 4) |
+             ((is_pin_din(4) && platform_gpio_read(KOMM_IOMAP_MASK & io_map[4]))<< 3) |
+             ((is_pin_din(5) && platform_gpio_read(KOMM_IOMAP_MASK & io_map[5]))<< 2) |
+             ((is_pin_din(6) && platform_gpio_read(KOMM_IOMAP_MASK & io_map[6]))<< 1) |
+             (is_pin_din(7) && platform_gpio_read(KOMM_IOMAP_MASK & io_map[7]));
+  reply[4] = 0x00;
+  reply[4] |= ((is_pin_din(8) && platform_gpio_read(KOMM_IOMAP_MASK & io_map[8]))<< 7) |
+              ((is_pin_din(9) && platform_gpio_read(KOMM_IOMAP_MASK & io_map[9]))<< 6);
+  reply[5] = crc8_gen(reply,5);
+  return 6;
+}
 //Get Outputs Fail
 //int komm_get_fail(){return KOMM_PECHO;}
 //Reset
