@@ -154,7 +154,26 @@ int komm_set_ain_thresholds(char *reply,char addr,const char *data, char size){r
 //Get Analog Input Thresholds
 int komm_get_ain_thresholds(char *reply,char addr){return KOMM_PECHO;}
 //Set Digital Output Values
-int komm_set_dout(char *reply,const char *data){return KOMM_PECHO;} //data size fixed to 4bytes
+int komm_set_dout(char *reply,const char *data, char size){
+  int i;
+  int cend = (KOMM_IONUM > (size<<3))? size<<3 : KOMM_IONUM;
+  int byte_cnt = 3+1+((cend-1)>>3);
+  reply[0] = 0x02;
+  reply[1] = 0x0B;
+  reply[2] = 0x02;
+  for(i=3;i<byte_cnt;i++) reply[i]=0; //zeroing data section
+  for(i=0;i<cend;i++)
+  {
+    if(is_pin_dout(i))
+    {
+      platform_gpio_write(KOMM_IOMAP_MASK & io_map[i],data[i/8]>>(0x7&~i));
+      if(platform_gpio_read(KOMM_IOMAP_MASK & io_map[i]))
+        reply[3+i/8] |= 1<<(0x7&~i);
+    }
+  }
+  reply[byte_cnt] = crc8_gen(reply,byte_cnt);
+  return ++byte_cnt;
+} //data size fixed to 2bytes
 //Set Digital Output Value
 int komm_set_dout_s(char *reply, char addr,char value){
   reply[0] = 0x02;
@@ -285,7 +304,7 @@ int komm_digest(char *reply,const char *ptr,char size){
         case 0x0A:
           rsize = komm_get_ain_thresholds(reply,*data_start); break;
         case 0x0B:
-          rsize = komm_set_dout(reply,data_start); break;
+          rsize = komm_set_dout(reply,data_start,len); break;
         case 0x0C:
           rsize = komm_set_dout_s(reply,*data_start,*(data_start+1)); break;
         case 0x0D:
