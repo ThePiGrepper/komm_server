@@ -25,8 +25,16 @@
 //useful constants
 #define KOMM_PVERSION 2
 
-#define KOMM_PERROR -1
-#define KOMM_PECHO -10
+#define KOMM_NOFLG_MASK 0x80 //Return type Mask
+#define KOMM_FLAGS_MASK 0x60 //Special Flags Mask
+#define KOMM_FLAG_RST   0x00 //RESET flag
+#define KOMM_FLAG_ERR   0x20 //ERROR flag
+#define KOMM_FLAG_ECH   0x40 //ECHO flag
+#define KOMM_FLAG_ETC   0x60 //TBD
+
+#define KOMM_PRST (KOMM_NOFLG_MASK | KOMM_FLAG_RST)
+#define KOMM_PERROR (KOMM_NOFLG_MASK | KOMM_FLAG_ERR)
+#define KOMM_PECHO (KOMM_NOFLG_MASK | KOMM_FLAG_ECH)
 
 #define KOMM_IO_NONE 0x00
 #define KOMM_IO_AIN_S 0x01
@@ -42,6 +50,8 @@
 #define KOMM_IO_RLY_16A_NO 0x0B
 #define KOMM_IO_RLY_20A_NO 0x0C
 
+#define komm_check_special_ret(ret) ((ret) & KOMM_NOFLG_MASK) //check if ret is normal or special
+#define komm_check_flag_type(ret) ((ret) & KOMM_FLAGS_MASK) //which special ret
 #define komm_checkprotocol(pver) (((pver)==0)||((pver)==2)) //Supports KOMM V2
 #define komm_checklen(ptr,size) (*((char*)(ptr)+2) == ((size) - 4))
 #define komm_checkcrc(ptr,size) 1 //dummy
@@ -241,8 +251,7 @@ int komm_reset(char *reply){
   reply[2] = 0x01;
   reply[3] = 0x00; //add status check maybe??
   reply[4] = crc8_gen(reply,4);
-  system_restart();
-  return 5;
+  return KOMM_PRST | 5;
 }
 int komm_echo_function(char *reply,const char *request){
   return KOMM_PECHO; //return ECHO return value
@@ -340,19 +349,37 @@ static int Lkomm_digest( lua_State* L )
   luaL_checktype( L, 1, LUA_TSTRING );
   ptr = lua_tolstring( L, 1, &len );
   rlen = komm_digest(reply,ptr,len);
-  if(rlen > 0)
+  if(komm_check_special_ret(rlen))
   {
+    switch(komm_check_flag_type(rlen))
+    {
+      int i;
+      case KOMM_FLAG_RST:
+        lua_pushinteger(L,1);
+        lua_pushlstring(L, reply,~KOMM_NOFLG_MASK & ~KOMM_FLAGS_MASK & rlen);
+        break;
+      case KOMM_FLAG_ERR:
+        lua_pushinteger(L,2);
+        lua_pushlstring(L,reply,0); //dummy(just for test)
+        break;
+      case KOMM_FLAG_ECH:
+        //c_memcpy(reply,ptr,len);
+        for(i=0;i<len;i++) *(reply+i)=*(ptr+i);
+        lua_pushinteger(L,3);
+        lua_pushlstring(L, reply,len);
+        break;
+      case KOMM_FLAG_ETC:
+      default:
+        lua_pushinteger(L,2);
+        lua_pushlstring(L,reply,0); //dummy(just for test)
+    }
+  }
+  else
+  {
+    lua_pushinteger(L, 0);
     lua_pushlstring(L, reply,rlen);
   }
-  else if(rlen == KOMM_PECHO)
-  {
-    //c_memcpy(reply,ptr,len);
-    int i;
-    for(i=0;i<len;i++) *(reply+i)=*(ptr+i);
-    lua_pushlstring(L, reply,len);
-  }
-  else lua_pushlstring(L,reply,0); //empty string(maybe)
-  return 1;
+  return 2;
 }
 
 static int Lkomm_info( lua_State* L)
