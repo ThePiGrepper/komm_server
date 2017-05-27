@@ -83,7 +83,11 @@ int komm_get_device_config(char *reply){
 
 #define KOMM_IOCONFNUM 13
 #define KOMM_IONUM 10
-char io_status[KOMM_IONUM] = {0,0,0,0,0,0,0,0,0,0};
+#define KOMM_STATE_LEN (KOMM_IONUM + KOMM_IONUM)
+
+char komm_state[KOMM_IONUM+KOMM_IONUM]; //main komm status
+char * const io_status = komm_state;
+char * const dout_status = (komm_state + KOMM_IONUM);
 //analog pins name scheme: analog pin number & 0x80
 const char io_map[KOMM_IONUM] = {0x80,0,5,6,7,1,2,8,9,10};
 #define KOMM_IOMAP_MASK 0x3F
@@ -177,8 +181,9 @@ int komm_set_dout(char *reply,const char *data, char size){
     if(is_pin_dout(i))
     {
       platform_gpio_write(KOMM_IOMAP_MASK & io_map[i],data[i/8]>>(0x7&~i));
-      if(platform_gpio_read(KOMM_IOMAP_MASK & io_map[i]))
-        reply[3+i/8] |= 1<<(0x7&~i);
+      char res = platform_gpio_read(KOMM_IOMAP_MASK & io_map[i]);
+      dout_status[i] = res;
+      if(res) reply[3+i/8] |= 1<<(0x7&~i);
     }
   }
   reply[byte_cnt] = crc8_gen(reply,byte_cnt);
@@ -194,7 +199,9 @@ int komm_set_dout_s(char *reply, char addr,char value){
   if(addr-1 < KOMM_IONUM && is_pin_dout(addr-1))
   {
     platform_gpio_write(KOMM_IOMAP_MASK & io_map[addr-1], value);
-    reply[4] = (char) platform_gpio_read(KOMM_IOMAP_MASK & io_map[addr-1]);
+    char res = (char) platform_gpio_read(KOMM_IOMAP_MASK & io_map[addr-1]);
+    reply[4] = res;
+    dout_status[addr-1] = res;
   }
   reply[5] = crc8_gen(reply,5);
   return 6;
@@ -271,7 +278,11 @@ int komm_zero_function(char *reply,char protocol,char cmd,char zero_cnt){
 }
 
 //parse function
-int komm_digest(char *reply,const char *ptr,char size){
+//returns:
+//  reply string
+//  rsize : reply size
+//  mod : returns if the internal state is modified (1) or not (0).
+int komm_digest(char *reply,const char *ptr,char size,char *mod){
   //check header
   char rsize;
   if(!komm_checkprotocol(*ptr)) return KOMM_PERROR; //checks for correct protocol version
@@ -280,6 +291,7 @@ int komm_digest(char *reply,const char *ptr,char size){
   char cmd = *(ptr+1);
   char len = *(ptr+2);
   const char *data_start = ptr + 3;
+  *mod = 0;
   switch(*ptr)
   {
     case 0x00:
@@ -299,23 +311,23 @@ int komm_digest(char *reply,const char *ptr,char size){
         case 0x03:
           rsize = komm_get_io_config(reply); break;
         case 0x04:
-          rsize = komm_set_io_config(reply,data_start,len); break;
+          rsize = komm_set_io_config(reply,data_start,len); *mod =1; break;
         case 0x05:
           rsize = komm_get_ain_values(reply); break;
         case 0x06:
           rsize = komm_get_ain_status(reply); break;
         case 0x07:
-          rsize = komm_set_ain_thresholds_common(reply,data_start,len); break;
+          rsize = komm_set_ain_thresholds_common(reply,data_start,len); *mod =1; break;
         case 0x08:
           rsize = komm_get_ain_thresholds_common(reply); break;
         case 0x09:
-          rsize = komm_set_ain_thresholds(reply,*(data_start),data_start+1,len-1); break;
+          rsize = komm_set_ain_thresholds(reply,*(data_start),data_start+1,len-1); *mod =1; break;
         case 0x0A:
           rsize = komm_get_ain_thresholds(reply,*data_start); break;
         case 0x0B:
-          rsize = komm_set_dout(reply,data_start,len); break;
+          rsize = komm_set_dout(reply,data_start,len); *mod =1; break;
         case 0x0C:
-          rsize = komm_set_dout_s(reply,*data_start,*(data_start+1)); break;
+          rsize = komm_set_dout_s(reply,*data_start,*(data_start+1)); *mod =1; break;
         case 0x0D:
           rsize = komm_get_dout(reply); break;
         case 0x0E:
@@ -346,9 +358,10 @@ static int Lkomm_digest( lua_State* L )
   char reply[255];
   const char* ptr;
   size_t len,rlen;
+  char mod;
   luaL_checktype( L, 1, LUA_TSTRING );
   ptr = lua_tolstring( L, 1, &len );
-  rlen = komm_digest(reply,ptr,len);
+  rlen = komm_digest(reply,ptr,len,&mod);
   if(komm_check_special_ret(rlen))
   {
     switch(komm_check_flag_type(rlen))
@@ -379,7 +392,61 @@ static int Lkomm_digest( lua_State* L )
     lua_pushinteger(L, 0);
     lua_pushlstring(L, reply,rlen);
   }
-  return 2;
+  lua_pushinteger(L, mod);
+  return 3;
+}
+
+static int Lkomm_getState( lua_State* L)
+{
+  lua_pushlstring(L, komm_state,KOMM_STATE_LEN);
+  return 1;
+}
+
+static int Lkomm_setState( lua_State* L)
+{
+  size_t len;
+  const char *str;
+  int i;
+  str = luaL_checklstring(L,-1,&len);
+  //update komm state
+  //this function does NOT check data validity before uploading it to main state.
+  //Very dangerous!!!
+  for(i=0;i<len;i++) komm_state[i] = str[i];
+  //Update gpio mode and output
+  for(i=0;i<KOMM_IONUM;i++)
+  {
+    switch(komm_state[i])
+    {
+      case KOMM_IO_NONE:
+        if(!(io_map[i]&0x80))
+        //  platform_gpio_mode(KOMM_IOMAP_MASK & io_map[i],INPUT,FLOAT);
+        //here write equivalent state for analog
+        break;
+      case KOMM_IO_AIN_S:
+      case KOMM_IO_AIN_NS: break;
+      case KOMM_IO_DIN:
+        //platform_gpio_mode(KOMM_IOMAP_MASK & io_map[i],INPUT,FLOAT); break;
+      case KOMM_IO_OC:
+        platform_gpio_mode(KOMM_IOMAP_MASK & io_map[i],OPENDRAIN,FLOAT);
+        platform_gpio_write(KOMM_IOMAP_MASK & io_map[i],komm_state[i+KOMM_IONUM]);
+        komm_state[i+KOMM_IONUM] = platform_gpio_read(KOMM_IOMAP_MASK & io_map[i]);
+        break;
+      case KOMM_IO_RLY_5A_NONC:
+      case KOMM_IO_RLY_10A_NONC:
+      case KOMM_IO_RLY_16A_NONC:
+      case KOMM_IO_RLY_20A_NONC:
+      case KOMM_IO_RLY_5A_NO:
+      case KOMM_IO_RLY_10A_NO:
+      case KOMM_IO_RLY_16A_NO:
+      case KOMM_IO_RLY_20A_NO:
+        platform_gpio_mode(KOMM_IOMAP_MASK & io_map[i],OUTPUT,FLOAT);
+        platform_gpio_write(KOMM_IOMAP_MASK & io_map[i],komm_state[i+KOMM_IONUM]);
+        komm_state[i+KOMM_IONUM] = platform_gpio_read(KOMM_IOMAP_MASK & io_map[i]);
+        break;
+      default: break;
+    }
+  }
+  return 0;
 }
 
 static int Lkomm_info( lua_State* L)
@@ -404,6 +471,8 @@ const LUA_REG_TYPE komm_map[] =
 {
   { LSTRKEY( "info" ), LFUNCVAL( Lkomm_info ) },
   { LSTRKEY( "digest" ), LFUNCVAL( Lkomm_digest ) },
+  { LSTRKEY( "getState" ), LFUNCVAL( Lkomm_getState ) },
+  { LSTRKEY( "setState" ), LFUNCVAL( Lkomm_setState ) },
   { LSTRKEY( "test" ), LFUNCVAL( Lkomm_test ) },
   { LNILKEY, LNILVAL } // This map must always end like this
 };
