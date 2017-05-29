@@ -167,8 +167,9 @@ int komm_get_ain_values(char *reply){
     if(is_pin_analog(j))
     {
       unsigned val = (((0xFFFF & system_adc_read())-1)*334)/1024;
-      reply[i] = (char) (val>8);
-      reply[i+1] = (char) (val & 0xff);
+      //endianness dependant!!
+      reply[i] = *(((char *)&val)+1);//(val>8);
+      reply[i+1] = *((char *) &val);//(val & 0xff);
     }
     else
     {
@@ -208,8 +209,9 @@ int komm_get_ain_status(char *reply){
   if(is_pin_analog(0))
   {
     unsigned val = (((0xFFFF & system_adc_read())-1)*334)/1024;
-    unsigned val_l = val & 0xff;
-    unsigned val_h = val > 8;
+    //endianness dependant!!
+    unsigned char val_h = *(((char *)&val)+1);//(val>8);
+    unsigned char val_l = *((char *) &val);//(val & 0xff);
     if(is_less_equal(val_h,val_l,komm_ain0_threshold0_h,komm_ain0_threshold0_l))  //val <= komm_ain0_threshold0
       status = 1;
     else if(is_less_equal(val_h,val_l,komm_ain0_threshold1_h,komm_ain0_threshold1_l)) //val <= komm_ain0_threshold1
