@@ -125,8 +125,9 @@ int komm_set_io_config(char *reply,const char *config,char size){
           if(!(io_map[i]&0x80))
             platform_gpio_mode(KOMM_IOMAP_MASK & io_map[i],INPUT,FLOAT);
           //here write equivalent state for analog
+          //analog input is set by default on this pin, so nothing it's done here.
           break;
-        case KOMM_IO_AIN_S:
+        case KOMM_IO_AIN_S: //analog is already set by default so nothing is done here.
         case KOMM_IO_AIN_NS: break;
         case KOMM_IO_DIN:
           platform_gpio_mode(KOMM_IOMAP_MASK & io_map[i],INPUT,FLOAT); break;
@@ -156,17 +157,177 @@ int komm_set_io_config(char *reply,const char *config,char size){
   return 3+1+i;
 }
 //Get Analog Input Values
-int komm_get_ain_values(char *reply){return KOMM_PECHO;}
+int komm_get_ain_values(char *reply){
+  int i,j=0;
+  reply[0] = 0x02;
+  reply[1] = 0x05;
+  reply[2] = 2 * KOMM_IONUM; //20bytes=10 IOs x 2bytes
+  for(i=3;i<(2*KOMM_IONUM+3);i+=2)
+  {
+    if(is_pin_analog(j))
+    {
+      unsigned val = (((0xFFFF & system_adc_read())-1)*334)/1024;
+      reply[i] = (char) (val>8);
+      reply[i+1] = (char) (val & 0xff);
+    }
+    else
+    {
+      reply[i] = 0x00;
+      reply[i+1] = 0x00;
+    }
+    j++;
+  }
+  reply[i] = crc8_gen(reply,i);
+  return i+1;
+}
+
+//Thresholds levels
+//Normally threshold_common and individual thresholds would be handled as different.
+//However, esp8266 has only one ADC channel so I wont be bothered with this for now.
+//Ain status will be determined by the 3 threshold values, in the following way:
+//
+//0 <= status0 < komm_ain0_threshold0
+//komm_ain0_threshold0 <= status1 < komm_ain0_threshold1
+//komm_ain0_threshold1 <= status2 < komm_ain0_threshold2
+//komm_ain0_threshold2 <= status3
+unsigned char komm_ain0_threshold0_l = 0x54; //84
+unsigned char komm_ain0_threshold0_h = 0x00;
+unsigned char komm_ain0_threshold1_l = 0xA8; //168
+unsigned char komm_ain0_threshold1_h = 0x00;
+unsigned char komm_ain0_threshold2_l = 0xFB; //251
+unsigned char komm_ain0_threshold2_h = 0x00;
+
+#define is_less_equal(ah,al,bh,bl) (!(ah>bh || (ah == bh && al > bl)))
 //Get Analog Inputs Status
-int komm_get_ain_status(char *reply){return KOMM_PECHO;}
+int komm_get_ain_status(char *reply){
+  char status = 0;
+  int i;
+  reply[0] = 0x02;
+  reply[1] = 0x06;
+  reply[2] = KOMM_IONUM; //20bytes=10 IOs x 2bytes
+  if(is_pin_analog(0))
+  {
+    unsigned val = (((0xFFFF & system_adc_read())-1)*334)/1024;
+    unsigned val_l = val & 0xff;
+    unsigned val_h = val > 8;
+    if(is_less_equal(val_h,val_l,komm_ain0_threshold0_h,komm_ain0_threshold0_l))  //val <= komm_ain0_threshold0
+      status = 1;
+    else if(is_less_equal(val_h,val_l,komm_ain0_threshold1_h,komm_ain0_threshold1_l)) //val <= komm_ain0_threshold1
+      status = 2;
+    else if(is_less_equal(val_h,val_l,komm_ain0_threshold2_h,komm_ain0_threshold2_l)) //val <= komm_ain0_threshold2
+      status = 3;
+    else
+      status = 4;
+  }
+  reply[3] = status;
+  for(i=4;i<(KOMM_IONUM+4-1);i++) reply[i] = 0x0;
+  reply[KOMM_IONUM + 4-1] = crc8_gen(reply,KOMM_IONUM +4-1);
+  return (KOMM_IONUM + 4-1+1);
+}
 //Set Analog Inputs Thresholds Common
-int komm_set_ain_thresholds_common(char *reply,const char *data,char size){return KOMM_PECHO;}
+int komm_set_ain_thresholds_common(char *reply,const char *data,char size){
+  reply[0] = 0x02;
+  reply[1] = 0x07;
+  reply[2] = 0x06;
+  if(is_less_equal(data[0],data[1],0x01,0x4D) &&
+     is_less_equal(data[2],data[3],0x01,0x4D) &&
+     is_less_equal(data[4],data[5],0x01,0x4D))
+  {
+    komm_ain0_threshold0_h = data[0];
+    komm_ain0_threshold0_l = data[1];
+    komm_ain0_threshold1_h = data[2];
+    komm_ain0_threshold1_l = data[3];
+    komm_ain0_threshold2_h = data[4];
+    komm_ain0_threshold2_l = data[5];
+    reply[3] = data[0];
+    reply[4] = data[1];
+    reply[5] = data[2];
+    reply[6] = data[3];
+    reply[7] = data[4];
+    reply[8] = data[5];
+  }
+  else
+  {
+    reply[3] = 0x00;
+    reply[4] = 0x00;
+    reply[5] = 0x00;
+    reply[6] = 0x00;
+    reply[7] = 0x00;
+    reply[8] = 0x00;
+  }
+  reply[9] = crc8_gen(reply,9);
+  return 10;
+}
+
 //Get Analog Inputs Thresholds Common
-int komm_get_ain_thresholds_common(char *reply){return KOMM_PECHO;}
+int komm_get_ain_thresholds_common(char *reply){
+  reply[0] = 0x02;
+  reply[1] = 0x08;
+  reply[2] = 0x06;
+  reply[3] = (char) komm_ain0_threshold0_h;
+  reply[4] = (char) komm_ain0_threshold0_l;
+  reply[5] = (char) komm_ain0_threshold1_h;
+  reply[6] = (char) komm_ain0_threshold1_l;
+  reply[7] = (char) komm_ain0_threshold2_h;
+  reply[8] = (char) komm_ain0_threshold2_l;
+  reply[9] = crc8_gen(reply,9);
+  return 10;
+}
+
 //Set Analog Input Thresholds
-int komm_set_ain_thresholds(char *reply,char addr,const char *data, char size){return KOMM_PECHO;}
+int komm_set_ain_thresholds(char *reply,char addr,const char *data, char size){
+  reply[0] = 0x02;
+  reply[1] = 0x09;
+  reply[2] = 0x02;
+  reply[3] = addr;
+  if(addr > 0 && addr-1 < KOMM_IONUM && is_pin_analog(addr-1) &&
+     is_less_equal(data[0],data[1],0x01,0x4D) &&
+     is_less_equal(data[2],data[3],0x01,0x4D) &&
+     is_less_equal(data[4],data[5],0x01,0x4D))
+  {
+    komm_ain0_threshold0_h = data[0];
+    komm_ain0_threshold0_l = data[1];
+    komm_ain0_threshold1_h = data[2];
+    komm_ain0_threshold1_l = data[3];
+    komm_ain0_threshold2_h = data[4];
+    komm_ain0_threshold2_l = data[5];
+    reply[4] = 0x00; //OK?
+  }
+  else
+  {
+    reply[4] = 0x01; //KO?
+  }
+  reply[5] = crc8_gen(reply,5);
+  return 6;
+}
+
 //Get Analog Input Thresholds
-int komm_get_ain_thresholds(char *reply,char addr){return KOMM_PECHO;}
+int komm_get_ain_thresholds(char *reply,char addr){
+  reply[0] = 0x02;
+  reply[1] = 0x0A;
+  reply[2] = 0x07;
+  reply[3] = addr;
+  if(addr > 0 && addr-1 < KOMM_IONUM && is_pin_analog(addr-1))
+  {
+    reply[4] = (char) komm_ain0_threshold0_h;
+    reply[5] = (char) komm_ain0_threshold0_l;
+    reply[6] = (char) komm_ain0_threshold1_h;
+    reply[7] = (char) komm_ain0_threshold1_l;
+    reply[8] = (char) komm_ain0_threshold2_h;
+    reply[9] = (char) komm_ain0_threshold2_l;
+  }
+  else
+  {
+    reply[4] = 0;
+    reply[5] = 0;
+    reply[6] = 0;
+    reply[7] = 0;
+    reply[8] = 0;
+    reply[9] = 0;
+  }
+  reply[10] = crc8_gen(reply,10);
+  return 11;
+}
 //Set Digital Output Values
 int komm_set_dout(char *reply,const char *data, char size){
   int i;
