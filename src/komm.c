@@ -676,6 +676,33 @@ static int Lkomm_test( lua_State* L)
     return 1;
 }
 
+/*
+ * Send initial communication with 'client'
+ * send several 'Get' functions replies.
+ * Functions sent:
+ * - komm_get_device_config()
+ * - komm_get_io_config()
+ * - komm_get_dout()
+ */
+static int Lkomm_invite( lua_State* L)
+{
+  char reply[255];
+  char *ptr;
+  int len;
+  len = komm_get_device_config(reply);
+  ptr = reply + len;
+  len = komm_get_io_config(ptr);
+  ptr += len;
+  len = komm_get_dout(ptr);
+  ptr += len;
+  len = komm_get_ain_thresholds_common(ptr);
+  ptr += len;
+  len = ptr - reply;
+  lua_pushlstring(L, reply,len);
+  lua_pushinteger(L, len);
+  return 2;
+}
+
 // Module function map, this is how we tell Lua what API our module has
 const LUA_REG_TYPE komm_map[] =
 {
@@ -684,6 +711,7 @@ const LUA_REG_TYPE komm_map[] =
   { LSTRKEY( "getState" ), LFUNCVAL( Lkomm_getState ) },
   { LSTRKEY( "setState" ), LFUNCVAL( Lkomm_setState ) },
   { LSTRKEY( "test" ), LFUNCVAL( Lkomm_test ) },
+  { LSTRKEY( "invite" ), LFUNCVAL( Lkomm_invite ) },
   { LNILKEY, LNILVAL } // This map must always end like this
 };
 
