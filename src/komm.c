@@ -83,9 +83,13 @@ int komm_get_device_config(char *reply){
 
 #define KOMM_IOCONFNUM 13
 #define KOMM_IONUM 10
-#define KOMM_STATE_LEN (KOMM_IONUM + KOMM_IONUM)
+#define KOMM_AIN_THRESHOLD 6
+#define KOMM_STATE_LEN (KOMM_IONUM + KOMM_IONUM + KOMM_AIN_THRESHOLD)
 
-char komm_state[KOMM_IONUM+KOMM_IONUM]; //main komm status
+char komm_state[KOMM_IONUM+KOMM_IONUM+KOMM_AIN_THRESHOLD]={0,0,0,0,0,0,0,0,0,0,
+                                                           0,0,0,0,0,0,0,0,0,0,
+                                                           0x54,0x00,0xA8,0x00,0xFB,0x00};
+
 char * const io_status = komm_state;
 char * const dout_status = (komm_state + KOMM_IONUM);
 //analog pins name scheme: analog pin number & 0x80
@@ -191,12 +195,12 @@ int komm_get_ain_values(char *reply){
 //komm_ain0_threshold0 <= status1 < komm_ain0_threshold1
 //komm_ain0_threshold1 <= status2 < komm_ain0_threshold2
 //komm_ain0_threshold2 <= status3
-unsigned char komm_ain0_threshold0_l = 0x54; //84
-unsigned char komm_ain0_threshold0_h = 0x00;
-unsigned char komm_ain0_threshold1_l = 0xA8; //168
-unsigned char komm_ain0_threshold1_h = 0x00;
-unsigned char komm_ain0_threshold2_l = 0xFB; //251
-unsigned char komm_ain0_threshold2_h = 0x00;
+#define komm_ain0_threshold0_l (*((unsigned char *)(komm_state + KOMM_IONUM+KOMM_IONUM+0)))
+#define komm_ain0_threshold0_h (*((unsigned char *)(komm_state + KOMM_IONUM+KOMM_IONUM+1)))
+#define komm_ain0_threshold1_l (*((unsigned char *)(komm_state + KOMM_IONUM+KOMM_IONUM+2)))
+#define komm_ain0_threshold1_h (*((unsigned char *)(komm_state + KOMM_IONUM+KOMM_IONUM+3)))
+#define komm_ain0_threshold2_l (*((unsigned char *)(komm_state + KOMM_IONUM+KOMM_IONUM+4)))
+#define komm_ain0_threshold2_h (*((unsigned char *)(komm_state + KOMM_IONUM+KOMM_IONUM+5)))
 
 #define is_less_equal(ah,al,bh,bl) (!(ah>bh || (ah == bh && al > bl)))
 //Get Analog Inputs Status
