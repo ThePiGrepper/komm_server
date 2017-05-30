@@ -69,16 +69,19 @@ char crc8_gen(const char *ptr, char size){
 int komm_get_device_config(char *reply){
   *reply = 0x00;
   *(reply+1) = 0x01;
-  *(reply+2) = 0x07;
+  *(reply+2) = 0x0F;
   *(reply+3) = (char)KOMM_PVERSION;
   *(reply+4) = 0x00;
   *(reply+5) = 0x00;
   *(reply+6) = 0x00;
   *(reply+7) = 0x00;
-  *(reply+8) = 0x00;
-  *(reply+9) = 0x03; //sensus ID
-  *(reply+10) = crc8_gen(reply,10);
-  return 11;
+  wifi_get_macaddr(0, reply+8);
+  *(reply+14) = 0x00;
+  *(reply+15) = 0x00;
+  *(reply+16) = 0x00;
+  *(reply+17) = 0x03; //sensus ID
+  *(reply+18) = crc8_gen(reply,18);
+  return 19;
 }
 
 #define KOMM_IOCONFNUM 13
