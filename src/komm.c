@@ -247,32 +247,42 @@ int komm_set_ain_thresholds_common(char *reply,const char *data,char size){
   reply[0] = 0x02;
   reply[1] = 0x07;
   reply[2] = 0x06;
-  if(is_less_equal(data[0],data[1],0x01,0x4D) &&
-     is_less_equal(data[2],data[3],0x01,0x4D) &&
-     is_less_equal(data[4],data[5],0x01,0x4D))
+  if(is_less_equal(data[0],data[1],0x01,0x4D))
   {
     komm_ain0_threshold0_h = data[0];
     komm_ain0_threshold0_l = data[1];
-    komm_ain0_threshold1_h = data[2];
-    komm_ain0_threshold1_l = data[3];
-    komm_ain0_threshold2_h = data[4];
-    komm_ain0_threshold2_l = data[5];
-    reply[3] = data[0];
-    reply[4] = data[1];
-    reply[5] = data[2];
-    reply[6] = data[3];
-    reply[7] = data[4];
-    reply[8] = data[5];
   }
   else
   {
-    reply[3] = 0x00;
-    reply[4] = 0x00;
-    reply[5] = 0x00;
-    reply[6] = 0x00;
-    reply[7] = 0x00;
-    reply[8] = 0x00;
+    komm_ain0_threshold0_h = 0x01;
+    komm_ain0_threshold0_l = 0x4D;
   }
+  if(is_less_equal(data[2],data[3],0x01,0x4D))
+  {
+    komm_ain0_threshold1_h = data[2];
+    komm_ain0_threshold1_l = data[3];
+  }
+  else
+  {
+    komm_ain0_threshold1_h = 0x01;
+    komm_ain0_threshold1_l = 0x4D;
+  }
+  if(is_less_equal(data[4],data[5],0x01,0x4D))
+  {
+    komm_ain0_threshold2_h = data[4];
+    komm_ain0_threshold2_l = data[5];
+  }
+  else
+  {
+    komm_ain0_threshold2_h = 0x01;
+    komm_ain0_threshold2_l = 0x4D;
+  }
+  reply[3] = komm_ain0_threshold0_h;
+  reply[4] = komm_ain0_threshold0_l;
+  reply[5] = komm_ain0_threshold1_h;
+  reply[6] = komm_ain0_threshold1_l;
+  reply[7] = komm_ain0_threshold2_h;
+  reply[8] = komm_ain0_threshold2_l;
   reply[9] = crc8_gen(reply,9);
   return 10;
 }
@@ -298,17 +308,38 @@ int komm_set_ain_thresholds(char *reply,char addr,const char *data, char size){
   reply[1] = 0x09;
   reply[2] = 0x02;
   reply[3] = addr;
-  if(addr > 0 && addr-1 < KOMM_IONUM && is_pin_analog(addr-1) &&
-     is_less_equal(data[0],data[1],0x01,0x4D) &&
-     is_less_equal(data[2],data[3],0x01,0x4D) &&
-     is_less_equal(data[4],data[5],0x01,0x4D))
+  if(addr > 0 && addr-1 < KOMM_IONUM && is_pin_analog(addr-1))
   {
-    komm_ain0_threshold0_h = data[0];
-    komm_ain0_threshold0_l = data[1];
-    komm_ain0_threshold1_h = data[2];
-    komm_ain0_threshold1_l = data[3];
-    komm_ain0_threshold2_h = data[4];
-    komm_ain0_threshold2_l = data[5];
+    if(is_less_equal(data[0],data[1],0x01,0x4D))
+    {
+      komm_ain0_threshold0_h = data[0];
+      komm_ain0_threshold0_l = data[1];
+    }
+    else
+    {
+      komm_ain0_threshold0_h = 0x01;
+      komm_ain0_threshold0_l = 0x4D;
+    }
+    if(is_less_equal(data[2],data[3],0x01,0x4D))
+    {
+      komm_ain0_threshold1_h = data[2];
+      komm_ain0_threshold1_l = data[3];
+    }
+    else
+    {
+      komm_ain0_threshold1_h = 0x01;
+      komm_ain0_threshold1_l = 0x4D;
+    }
+    if(is_less_equal(data[4],data[5],0x01,0x4D))
+    {
+      komm_ain0_threshold2_h = data[4];
+      komm_ain0_threshold2_l = data[5];
+    }
+    else
+    {
+      komm_ain0_threshold2_h = 0x01;
+      komm_ain0_threshold2_l = 0x4D;
+    }
     reply[4] = 0x00; //OK?
   }
   else
