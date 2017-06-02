@@ -50,6 +50,9 @@
 #define KOMM_IO_RLY_16A_NO 0x0B
 #define KOMM_IO_RLY_20A_NO 0x0C
 
+#define KOMM_IO_OC_DEFAULT_VAL 0x00
+#define KOMM_IO_PP_DEFAULT_VAL 0x00
+
 #define komm_check_special_ret(ret) ((ret) & KOMM_NOFLG_MASK) //check if ret is normal or special
 #define komm_check_flag_type(ret) ((ret) & KOMM_FLAGS_MASK) //which special ret
 #define komm_checkprotocol(pver) (((pver)==0)||((pver)==2)) //Supports KOMM V2
@@ -129,7 +132,7 @@ int komm_set_io_config(char *reply,const char *config,char size){
       switch(nmode)
       {
         case KOMM_IO_NONE:
-          if(!(io_map[i]&0x80))
+          if(io_map[i] != 0x80) //quick fix
             platform_gpio_mode(KOMM_IOMAP_MASK & io_map[i],INPUT,FLOAT);
           //here write equivalent state for analog
           //analog input is set by default on this pin, so nothing it's done here.
@@ -139,7 +142,10 @@ int komm_set_io_config(char *reply,const char *config,char size){
         case KOMM_IO_DIN:
           platform_gpio_mode(KOMM_IOMAP_MASK & io_map[i],INPUT,FLOAT); break;
         case KOMM_IO_OC:
-          platform_gpio_mode(KOMM_IOMAP_MASK & io_map[i],OPENDRAIN,FLOAT); break;
+          platform_gpio_mode(KOMM_IOMAP_MASK & io_map[i],OPENDRAIN,FLOAT);
+          platform_gpio_write(KOMM_IOMAP_MASK & io_map[i],KOMM_IO_OC_DEFAULT_VAL);
+          komm_state[i+KOMM_IONUM] = platform_gpio_read(KOMM_IOMAP_MASK & io_map[i]);
+          break;
         case KOMM_IO_RLY_5A_NONC:
         case KOMM_IO_RLY_10A_NONC:
         case KOMM_IO_RLY_16A_NONC:
@@ -148,7 +154,10 @@ int komm_set_io_config(char *reply,const char *config,char size){
         case KOMM_IO_RLY_10A_NO:
         case KOMM_IO_RLY_16A_NO:
         case KOMM_IO_RLY_20A_NO:
-          platform_gpio_mode(KOMM_IOMAP_MASK & io_map[i],OUTPUT,FLOAT); break;
+          platform_gpio_mode(KOMM_IOMAP_MASK & io_map[i],OUTPUT,FLOAT);
+          platform_gpio_write(KOMM_IOMAP_MASK & io_map[i],KOMM_IO_PP_DEFAULT_VAL);
+          komm_state[i+KOMM_IONUM] = platform_gpio_read(KOMM_IOMAP_MASK & io_map[i]);
+          break;
         default: break;
       }
       //update io_status with new mode
@@ -588,14 +597,14 @@ static int Lkomm_setState( lua_State* L)
     switch(komm_state[i])
     {
       case KOMM_IO_NONE:
-        if(!(io_map[i]&0x80))
-        //  platform_gpio_mode(KOMM_IOMAP_MASK & io_map[i],INPUT,FLOAT);
+        if(io_map[i] != 0x80) //quick fix
+          platform_gpio_mode(KOMM_IOMAP_MASK & io_map[i],INPUT,FLOAT);
         //here write equivalent state for analog
         break;
       case KOMM_IO_AIN_S:
       case KOMM_IO_AIN_NS: break;
       case KOMM_IO_DIN:
-        //platform_gpio_mode(KOMM_IOMAP_MASK & io_map[i],INPUT,FLOAT); break;
+        platform_gpio_mode(KOMM_IOMAP_MASK & io_map[i],INPUT,FLOAT); break;
       case KOMM_IO_OC:
         platform_gpio_mode(KOMM_IOMAP_MASK & io_map[i],OPENDRAIN,FLOAT);
         platform_gpio_write(KOMM_IOMAP_MASK & io_map[i],komm_state[i+KOMM_IONUM]);
