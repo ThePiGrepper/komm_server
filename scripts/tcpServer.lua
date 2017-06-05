@@ -2,11 +2,19 @@
 
 lastDump={}
 lastReply={}
+timeOut_Cnt = 60 -- in seconds
+
+dst_addr = "172.168.1.15"
+dst_port = 9000
 
 -- Waiting for Connection
 tmr.alarm(0, 1000, 1, function()
    if wifi.sta.getip() == nil then
       print("Connecting to AP...\n")
+      timeOut_Cnt = timeOut_Cnt - 1
+      if timeOut_Cnt <= 0 then
+        node.restart()
+      end
    else
       enduser_setup.stop()
       ip, nm, gw=wifi.sta.getip()
@@ -18,15 +26,17 @@ tmr.alarm(0, 1000, 1, function()
         print('Previous State Loaded')
       end
        -- Start a simple http server
-      srv=net.createServer(net.TCP)
-      srv:listen(80,function(conn)
+      --srv=net.createServer(net.TCP)
+      --srv:listen(80,function(conn)
+      conn=net.createConnection(net.TCP)
         conn:on("receive",function(conn,payload)
           lastDump = payload
           if(payload == "uart_on") then
             uart.setup(0,115200,8,uart.PARITY_NONE,uart.STOPBITS_1);
           elseif(payload == "wifi_rst") then
-            node.restore()
             print('forget')
+            node.restore()
+            node.restart()
           elseif (string.byte(payload:sub(1,1)) == 0) or (string.byte(payload:sub(1,1)) == 2) then
             ret,reply,mod = komm.digest(payload)
             print('modified?='..mod)
@@ -51,7 +61,17 @@ tmr.alarm(0, 1000, 1, function()
           end
         end)
         --conn:on("sent",function(conn) conn:close() end)
-      end)
+        conn:on("connection",function(conn)
+          msg = komm.invite()
+          print(msg)
+          conn:send(msg)
+        end)
+        conn:on("disconnection",function(conn)
+          print("disconnected")
+          node.restart()
+        end)
+        conn:connect(dst_port,dst_addr)
+      --end)
       tmr.stop(0)
    end
  end)
