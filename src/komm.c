@@ -711,6 +711,32 @@ static int Lkomm_invite( lua_State* L)
   return 2;
 }
 
+char last_din[2] = {0,0};
+char last_ain_status = 0;
+static int Lkomm_getUpdate( lua_State* L)
+{
+  char reply[255];
+  char *ptr = reply;
+  int len;
+  len = komm_get_din(ptr);
+  if(last_din[0] != ptr[3] || last_din[1] != ptr[4])
+  {
+    last_din[0] = ptr[3];
+    last_din[1] = ptr[4];
+    ptr += len;
+  }
+  len = komm_get_ain_status(ptr);
+  if(last_ain_status != ptr[3])
+  {
+    last_ain_status = ptr[3];
+    ptr += len;
+  }
+  len = ptr - reply;
+  lua_pushlstring(L, reply,len);
+  lua_pushinteger(L, len);
+  return 2;
+}
+
 // Module function map, this is how we tell Lua what API our module has
 const LUA_REG_TYPE komm_map[] =
 {
@@ -720,6 +746,7 @@ const LUA_REG_TYPE komm_map[] =
   { LSTRKEY( "setState" ), LFUNCVAL( Lkomm_setState ) },
   { LSTRKEY( "test" ), LFUNCVAL( Lkomm_test ) },
   { LSTRKEY( "invite" ), LFUNCVAL( Lkomm_invite ) },
+  { LSTRKEY( "getUpdate" ), LFUNCVAL( Lkomm_getUpdate ) },
   { LNILKEY, LNILVAL } // This map must always end like this
 };
 

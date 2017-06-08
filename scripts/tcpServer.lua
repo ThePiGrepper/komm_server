@@ -2,7 +2,7 @@
 
 lastDump={}
 lastReply={}
-timeOut_Cnt = 60 -- in seconds
+timeOut_Cnt = 90 -- in seconds
 
 dst_addr = "172.168.1.15"
 dst_port = 9000
@@ -47,24 +47,31 @@ tmr.alarm(0, 1000, 1, function()
             lastReply = reply
             if(ret == 0) then
               --reply = payload
-              uart.write(0,">> "..payload.." | "..reply.." <<\n")
+              uart.write(0,">> "..crypto.toHex(payload).." | "..crypto.toHex(reply).." <<\n")
               conn:send(reply)
               --conn:send(">> "..payload.." | "..reply.." <<")
             elseif(ret == 1) then -- reset
-              uart.write(0,">> "..payload.." | "..reply.." <<\n")
+              uart.write(0,">> "..crypto.toHex(payload).." | "..crypto.toHex(reply).." <<\n")
               conn:send(reply)
               node.restart()
               --print("THIS!")
             else --error
-              uart.write(0,"?>"..payload.." | "..reply.." <<\n")
+              uart.write(0,"?>"..crypto.toHex(payload).." | "..crypto.tohex(reply).." <<\n")
             end
           end
         end)
         --conn:on("sent",function(conn) conn:close() end)
         conn:on("connection",function(conn)
           msg = komm.invite()
-          print(msg)
+          print(crypto.toHex(msg))
           conn:send(msg)
+          tmr.alarm(1, 500, 1, function()
+            msg,len = komm.getUpdate()
+            if len > 0 then
+              print(crypto.toHex(msg))
+              conn:send(msg)
+            end
+          end)
         end)
         conn:on("disconnection",function(conn)
           print("disconnected")
