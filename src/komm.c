@@ -57,7 +57,12 @@
 #define komm_check_flag_type(ret) ((ret) & KOMM_FLAGS_MASK) //which special ret
 #define komm_checkprotocol(pver) (((pver)==0)||((pver)==2)) //Supports KOMM V2
 #define komm_checklen(ptr,size) (*((char*)(ptr)+2) == ((size) - 4))
-#define komm_checkcrc(ptr,size) 1 //dummy
+
+#ifdef CHECKCRC
+  #define komm_checkcrc(ptr,size) (crc8_gen(ptr,size) == (unsigned char)ptr[size+3])
+#else
+  #define komm_checkcrc(ptr,size) 1 //dummy
+#endif
 
 //pin starts at 0, based on io_status array order.
 #define is_pin_analog(pin) (io_status[pin]>KOMM_IO_NONE && io_status[pin]<=KOMM_IO_AIN_NS)
@@ -65,9 +70,12 @@
 #define is_pin_dout(pin) (io_status[pin]>=KOMM_IO_OC && io_status[pin]<=KOMM_IO_RLY_20A_NO)
 
 //CRC8 generation
-char crc8_gen(const char *ptr, char size){
-  return 0;
+unsigned char crc8_gen(const unsigned char *ptr, unsigned char size){
+	unsigned int nTemp = 0;
+	while (size--) nTemp += *ptr++;
+	return (unsigned char)(nTemp & 0xFF);
 }
+
 //Get Device Config
 int komm_get_device_config(char *reply){
   *reply = 0x00;
