@@ -109,6 +109,7 @@ char * const dout_status = (komm_state + KOMM_IONUM);
 //analog pins name scheme: analog pin number & 0x80
 const char io_map[KOMM_IONUM] = {0x80,0,5,6,7,1,2,8,9,10};
 #define KOMM_IOMAP_MASK 0x3F
+
 //Set Device Config
 //komm_set_device_config(){return KOMM_PECHO;}
 //Get IO Configuration
@@ -180,6 +181,7 @@ int komm_set_io_config(char *reply,const char *config,char size){
   reply[3+i] = crc8_gen(reply,3+i);
   return 3+1+i;
 }
+
 //Get Analog Input Values
 int komm_get_ain_values(char *reply){
   int i,j=0;
@@ -223,6 +225,7 @@ int komm_get_ain_values(char *reply){
 #define komm_ain0_threshold2_h (*((unsigned char *)(komm_state + KOMM_IONUM+KOMM_IONUM+5)))
 
 #define is_less_equal(ah,al,bh,bl) (!(ah>bh || (ah == bh && al > bl)))
+
 //Get Analog Inputs Status
 int komm_get_ain_status(char *reply){
   char status = 0;
@@ -250,6 +253,7 @@ int komm_get_ain_status(char *reply){
   reply[KOMM_IONUM + 4-1] = crc8_gen(reply,KOMM_IONUM +4-1);
   return (KOMM_IONUM + 4-1+1);
 }
+
 //Set Analog Inputs Thresholds Common
 int komm_set_ain_thresholds_common(char *reply,const char *data,char size){
   reply[0] = 0x02;
@@ -385,6 +389,7 @@ int komm_get_ain_thresholds(char *reply,char addr){
   reply[10] = crc8_gen(reply,10);
   return 11;
 }
+
 //Set Digital Output Values
 int komm_set_dout(char *reply,const char *data, char size){
   int i;
@@ -407,6 +412,7 @@ int komm_set_dout(char *reply,const char *data, char size){
   reply[byte_cnt] = crc8_gen(reply,byte_cnt);
   return ++byte_cnt;
 } //data size fixed to 2bytes
+
 //Set Digital Output Value
 int komm_set_dout_s(char *reply, char addr,char value){
   reply[0] = 0x02;
@@ -424,6 +430,7 @@ int komm_set_dout_s(char *reply, char addr,char value){
   reply[5] = crc8_gen(reply,5);
   return 6;
 }
+
 //Get Digital Output Values
 int komm_get_dout(char *reply){
   reply[0] = 0x02;
@@ -448,6 +455,7 @@ int komm_get_dout(char *reply){
 int komm_get_clousure(char *reply){return KOMM_PECHO;}
 //Get Output Clousures
 int komm_get_clousure_s(char *reply, char addr){return KOMM_PECHO;}
+
 //Get Digital Inputs
 int komm_get_din(char *reply){
   reply[0] = 0x02;
@@ -467,8 +475,10 @@ int komm_get_din(char *reply){
   reply[5] = crc8_gen(reply,5);
   return 6;
 }
+
 //Get Outputs Fail
 //int komm_get_fail(){return KOMM_PECHO;}
+
 //Reset
 int komm_reset(char *reply){
   reply[0] = 0x02;
