@@ -488,6 +488,18 @@ int komm_reset(char *reply){
   reply[4] = crc8_gen(reply,4);
   return KOMM_PRST | 5;
 }
+
+//Reset
+int komm_resetWifi(char *reply){
+  reply[0] = 0x02;
+  reply[1] = 0x13;
+  reply[2] = 0x01;
+  reply[3] = 0x00; //add status check maybe??
+  reply[4] = crc8_gen(reply,4);
+  system_restore();
+  return KOMM_PRST | 5;
+}
+
 int komm_echo_function(char *reply,const char *request){
   return KOMM_PECHO; //return ECHO return value
 }
@@ -568,6 +580,8 @@ int komm_digest(char *reply,const char *ptr,char size,char *mod){
           rsize = komm_zero_function(reply,2,0x11,4); break;
         case 0x12:
           rsize = komm_reset(reply); break;
+        case 0x13:
+          rsize = komm_resetWifi(reply); break;
         default: //unknown function. return echo.
           rsize = komm_echo_function(reply,ptr);
       }
