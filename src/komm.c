@@ -102,7 +102,7 @@ int komm_get_device_config(char *reply){
 
 char komm_state[KOMM_IONUM+KOMM_IONUM+KOMM_AIN_THRESHOLD]={0,0,0,0,0,0,0,0,0,0,
                                                            0,0,0,0,0,0,0,0,0,0,
-                                                           0x54,0x00,0xA8,0x00,0xFB,0x00};
+                                                           0x00,0x01,0x00,0x02,0x00,0x03};
 
 char * const io_status = komm_state;
 char * const dout_status = (komm_state + KOMM_IONUM);
@@ -192,7 +192,7 @@ int komm_get_ain_values(char *reply){
   {
     if(is_pin_analog(j))
     {
-      unsigned val = (((0xFFFF & system_adc_read())-1)*334)/1024;
+      unsigned val = (0xFFFF & system_adc_read());
       //endianness dependant!!
       reply[i] = *(((char *)&val)+1);//(val>8);
       reply[i+1] = *((char *) &val);//(val & 0xff);
@@ -235,7 +235,7 @@ int komm_get_ain_status(char *reply){
   reply[2] = KOMM_IONUM; //20bytes=10 IOs x 2bytes
   if(is_pin_analog(0))
   {
-    unsigned val = (((0xFFFF & system_adc_read())-1)*334)/1024;
+    unsigned val = (0xFFFF & system_adc_read());
     //endianness dependant!!
     unsigned char val_h = *(((char *)&val)+1);//(val>8);
     unsigned char val_l = *((char *) &val);//(val & 0xff);
@@ -661,7 +661,11 @@ static int Lkomm_setState( lua_State* L)
     {
       case KOMM_IO_NONE:
         if(io_map[i] != 0x80) //quick fix
-          platform_gpio_mode(KOMM_IOMAP_MASK & io_map[i],INPUT,FLOAT);
+        {
+          //NULL value enables uart_mode on pins 9,10 after reset.
+          if(i!=8 && i!=9) //IO9,IO10
+            platform_gpio_mode(KOMM_IOMAP_MASK & io_map[i],INPUT,FLOAT);
+        }
         //here write equivalent state for analog
         break;
       case KOMM_IO_AIN_S:
