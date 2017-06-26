@@ -758,6 +758,8 @@ static int Lkomm_getUpdate( lua_State* L)
   {
     last_ain_status = ptr[3];
     ptr += len;
+    len = komm_get_ain_values(ptr);
+    ptr += len;
   }
   len = ptr - reply;
   lua_pushlstring(L, reply,len);
