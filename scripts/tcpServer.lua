@@ -52,8 +52,10 @@ tmr.alarm(0, 1000, 1, function()
               --conn:send(">> "..payload.." | "..reply.." <<")
             elseif(ret == 1) then -- reset
               uart.write(0,">> "..crypto.toHex(payload).." | "..crypto.toHex(reply).." <<\n")
+              conn:on("sent",function(conn)
+                node.restart()
+              end)
               conn:send(reply)
-              node.restart()
               --print("THIS!")
             else --error
               uart.write(0,"?>"..crypto.toHex(payload).." | "..crypto.tohex(reply).." <<\n")
