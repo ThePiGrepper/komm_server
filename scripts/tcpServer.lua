@@ -2,17 +2,18 @@
 
 lastDump={}
 lastReply={}
-timeOut_Cnt = 90 -- in seconds
+conn_timeout = 90 -- in seconds
+reconn_timeout = 90 -- in tries
 
 dst_addr = "172.168.1.15"
 dst_port = 9000
 
 -- Waiting for Connection
-tmr.alarm(0, 1000, 1, function()
+tmr.alarm(0, 1000, tmr.ALARM_AUTO, function()
    if wifi.sta.getip() == nil then
       print("Connecting to AP...\n")
-      timeOut_Cnt = timeOut_Cnt - 1
-      if timeOut_Cnt <= 0 then
+      conn_timeout = conn_timeout - 1
+      if conn_timeout <= 0 then
         node.restart()
       end
    else
@@ -64,10 +65,11 @@ tmr.alarm(0, 1000, 1, function()
         end)
         --conn:on("sent",function(conn) conn:close() end)
         conn:on("connection",function(conn)
+          reconn_timeout = 90 -- here set number of disconnection retries
           msg = komm.invite()
           print(crypto.toHex(msg))
           conn:send(msg)
-          tmr.alarm(1, 500, 1, function()
+          tmr.alarm(1, 500, tmr.ALARM_AUTO, function()
             msg,len = komm.getUpdate()
             if len > 0 then
               print(crypto.toHex(msg))
@@ -76,8 +78,16 @@ tmr.alarm(0, 1000, 1, function()
           end)
         end)
         conn:on("disconnection",function(conn)
-          print("disconnected")
-          node.restart()
+          if reconn_timeout > 0 then
+            reconn_timeout= reconn_timeout - 1
+            print("disconnected : try #"..reconn_timeout)
+            tmr.alarm(2, 3000, tmr.ALARM_SINGLE, function()
+              conn:connect(dst_port,dst_addr)
+            end)
+          else
+            print("disconnected")
+            node.restart()
+          end
         end)
         conn:connect(dst_port,dst_addr)
       --end)
