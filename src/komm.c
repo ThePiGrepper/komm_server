@@ -602,6 +602,7 @@ int komm_digest(char *reply,const char *ptr,char size,char *mod){
 
 /*** KOMM core library END ***/
 
+#ifdef __CPU_ESP8266_H__
 // Lua: write( id, string1, [string2], ..., [stringn] )
 static int Lkomm_digest( lua_State* L )
 {
@@ -789,3 +790,4 @@ const LUA_REG_TYPE komm_map[] =
 };
 
 NODEMCU_MODULE(KOMM, "komm", komm_map, NULL);
+#endif
