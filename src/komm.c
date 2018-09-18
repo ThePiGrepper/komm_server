@@ -3,13 +3,15 @@
 // Usage:
 // komm.digest(request)
 
+#include "platform.h"
+#ifdef __CPU_ESP8266_H__
 #include "lualib.h"
 #include "lauxlib.h"
-#include "platform.h"
 #include "module.h"
 #include "user_interface.h"
 #include "c_types.h"
 #include "c_string.h"
+#endif
 
 #define PULLUP PLATFORM_GPIO_PULLUP
 #define FLOAT PLATFORM_GPIO_FLOAT
