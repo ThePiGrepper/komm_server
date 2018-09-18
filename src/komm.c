@@ -66,6 +66,12 @@
   #define komm_checkcrc(ptr,size) 1 //dummy
 #endif
 
+#ifdef __CPU_ESP8266_H__
+  #define GET_DEVID wifi_get_macaddr
+#else
+  #define GET_DEVID get_devID
+#endif
+
 //pin starts at 0, based on io_status array order.
 #define is_pin_analog(pin) (io_status[pin]>KOMM_IO_NONE && io_status[pin]<=KOMM_IO_AIN_NS)
 #define is_pin_din(pin) (io_status[pin] == KOMM_IO_DIN)
@@ -88,7 +94,7 @@ int komm_get_device_config(char *reply){
   *(reply+5) = 0x00;
   *(reply+6) = 0x00;
   *(reply+7) = 0x00;
-  wifi_get_macaddr(0, reply+8);
+  GET_DEVID(0, reply+8);
   *(reply+14) = 0x00;
   *(reply+15) = 0x00;
   *(reply+16) = 0x00;
