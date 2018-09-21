@@ -78,9 +78,9 @@
 #define is_pin_dout(pin) (io_status[pin]>=KOMM_IO_OC && io_status[pin]<=KOMM_IO_RLY_20A_NO)
 
 //CRC8 generation
-unsigned char crc8_gen(const unsigned char *ptr, unsigned char size){
+unsigned char crc8_gen(const char *ptr, unsigned char size){
 	unsigned int nTemp = 0;
-	while (size--) nTemp += *ptr++;
+	while (size--) nTemp += (unsigned char)(*ptr++);
 	return (unsigned char)(nTemp & 0xFF);
 }
 
