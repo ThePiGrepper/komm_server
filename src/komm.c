@@ -108,12 +108,12 @@ int komm_get_device_config(char *reply){
 #define KOMM_AIN_THRESHOLD 6
 #define KOMM_STATE_LEN (KOMM_IONUM + KOMM_IONUM + KOMM_AIN_THRESHOLD)
 
-char komm_state[KOMM_IONUM+KOMM_IONUM+KOMM_AIN_THRESHOLD]={0,0,0,0,0,0,0,0,0,0,
+int8_t komm_state[KOMM_IONUM+KOMM_IONUM+KOMM_AIN_THRESHOLD]={0,0,0,0,0,0,0,0,0,0,
                                                            0,0,0,0,0,0,0,0,0,0,
                                                            0x00,0x01,0x00,0x02,0x00,0x03};
 
-char * const io_status = komm_state;
-char * const dout_status = (komm_state + KOMM_IONUM);
+int8_t * const io_status = komm_state;
+int8_t * const dout_status = (komm_state + KOMM_IONUM);
 //analog pins name scheme: analog pin number & 0x80
 const char io_map[KOMM_IONUM] = {0x80,0,5,6,7,1,2,8,9,10};
 #define KOMM_IOMAP_MASK 0x3F
